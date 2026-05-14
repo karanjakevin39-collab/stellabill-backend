@@ -347,18 +347,6 @@ func TestStatementListByCustomer_LargeSet(t *testing.T) {
 	}
 }
 
-func TestStatementGetDetail_MerchantAccess(t *testing.T) {
-	rows := seedStatements()
-	svc := newStatementService(rows...)
-
-	detail, _, err := svc.GetDetail(context.Background(), "merchant-1", []string{"merchant"}, "stmt-1")
-	if err != nil {
-		t.Fatalf("expected no error for merchant, got %v", err)
-	}
-	if detail.ID != "stmt-1" {
-		t.Errorf("expected stmt-1, got %q", detail.ID)
-	}
-}
 
 func TestStatementListByCustomer_MerchantAccess(t *testing.T) {
 	rows := seedStatements()

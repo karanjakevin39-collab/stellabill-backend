@@ -2,23 +2,22 @@ package routes
 
 import (
 	"fmt"
-	"net/http"
-	"os"
 
 	"stellarbill-backend/internal/auth"
 	"stellarbill-backend/internal/config"
 	"stellarbill-backend/internal/handlers"
 	"stellarbill-backend/internal/middleware"
+	"stellarbill-backend/internal/reconciliation"
 	"stellarbill-backend/internal/repository"
 	"stellarbill-backend/internal/service"
-	"stellarbill-backend/internal/tracing"
-	"stellarbill-backend/internal/reconciliation"
 	"stellarbill-backend/internal/startup"
+	"stellarbill-backend/internal/tracing"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
+// Register configures all routes on the provided router.
 func Register(r *gin.Engine) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -58,39 +57,38 @@ func Register(r *gin.Engine) {
 
 	// Dependencies
 	subRepo := repository.NewMockSubscriptionRepo()
-	_ = repository.NewMockPlanRepo() // Placeholder
+	planRepo := repository.NewMockPlanRepo()
 	stmtRepo := repository.NewMockStatementRepo()
 
 	stmtSvc := service.NewStatementService(subRepo, stmtRepo)
-	svc := service.NewSubscriptionService(subRepo)
-	
+	svc := service.NewSubscriptionService(subRepo, planRepo)
+
 	// Create handlers
 	h := handlers.NewHandler(nil, nil)
 	adminHandler := handlers.NewAdminHandler(cfg.AdminToken)
-	
+
 	// Auth configuration
 	jwtSecret := cfg.JWTSecret
-	// For now, jwksCache is nil as it's not fully wired in config yet
 	authMiddleware := middleware.AuthMiddleware(nil, jwtSecret)
 
 	// API Groups
 	api := r.Group("/api")
 	v1 := api.Group("/v1")
-	
+
 	dep := middleware.DeprecationHeaders()
 
 	// Public health check
-	api.GET("/health", dep, handlers.Health)
-	v1.GET("/health", handlers.Health)
+	api.GET("/health", dep, h.LivenessProbe)
+	v1.GET("/health", h.LivenessProbe)
 	api.GET("/liveness", h.LivenessProbe)
 	api.GET("/readiness", h.ReadinessProbe)
 
 	// V1 routes are all protected
 	v1.Use(authMiddleware)
 	{
-		v1.GET("/subscriptions", handlers.ListSubscriptions)
+		v1.GET("/subscriptions", h.ListSubscriptions)
 		v1.GET("/subscriptions/:id", handlers.NewGetSubscriptionHandler(svc))
-		v1.GET("/plans", handlers.ListPlans)
+		v1.GET("/plans", h.ListPlans)
 		v1.GET("/statements/:id", handlers.NewGetStatementHandler(stmtSvc))
 		v1.GET("/statements", handlers.NewListStatementsHandler(stmtSvc))
 	}
@@ -102,19 +100,19 @@ func Register(r *gin.Engine) {
 		apiProtected.GET("/plans",
 			dep,
 			auth.RequirePermission(auth.PermReadPlans),
-			handlers.ListPlans,
+			h.ListPlans,
 		)
 
 		apiProtected.GET("/subscriptions",
 			dep,
 			auth.RequirePermission(auth.PermReadSubscriptions),
-			handlers.ListSubscriptions,
+			h.ListSubscriptions,
 		)
 
 		apiProtected.GET("/subscriptions/:id",
 			dep,
 			auth.RequirePermission(auth.PermReadSubscriptions),
-			handlers.GetSubscription,
+			h.GetSubscription,
 		)
 
 		apiProtected.GET("/statements/:id", handlers.NewGetStatementHandler(stmtSvc))
@@ -128,7 +126,7 @@ func Register(r *gin.Engine) {
 		// Diagnostics endpoint — re-runs startup checks for live triage
 		diagHandler := startup.NewDiagnosticsHandler(cfg, nil, nil)
 		admin.GET("/diagnostics", auth.RequirePermission(auth.PermManageSubscriptions), diagHandler.Handle)
-		
+
 		// Reconciliation — scoped by RBAC and tenant
 		adapter := reconciliation.NewMemoryAdapter()
 		reconStore := reconciliation.NewMemoryStore()

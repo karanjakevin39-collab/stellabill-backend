@@ -149,33 +149,6 @@ const (
 	MaxRateLimitBurst     = 2000
 )
 
-// Required environment variables
-var requiredEnvVars = []string{
-	"DATABASE_URL",
-	"JWT_SECRET",
-	"ADMIN_TOKEN",
-}
-
-// Optional environment variables with defaults
-var optionalEnvVars = map[string]string{
-	"PORT":             "8080",
-	"ENV":              "development",
-	"MAX_HEADER_BYTES": "1048576",
-	"READ_TIMEOUT":     "30",
-	"WRITE_TIMEOUT":    "30",
-	"IDLE_TIMEOUT":     "120",
-	"TRACING_EXPORTER":     "stdout",
-	"TRACING_SERVICE_NAME": "stellabill-backend",
-	// DB pool
-	"DB_POOL_MAX_CONNS":           "25",
-	"DB_POOL_MIN_CONNS":           "2",
-	"DB_POOL_MAX_CONN_LIFETIME":   "3600",
-	"DB_POOL_MAX_CONN_IDLE_TIME":  "600",
-	"DB_POOL_CONNECT_TIMEOUT":     "5",
-	"DB_POOL_HEALTH_CHECK_PERIOD": "30",
-	"DB_POOL_METRICS_INTERVAL":    "15",
-}
-
 // Option configures the Load function.
 type Option func(*loadOptions)
 
@@ -597,39 +570,19 @@ func isValidSecret(secret string) bool {
 	return hasUpper && hasLower && hasDigit && hasSpecial
 }
 
-func isValidSecureOrigin(origin string) bool {
-	if origin == "" {
-		return false
-	}
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-	if parsed.Scheme != "https" {
-		return false
-	}
-	if parsed.Host == "" {
-		return false
-	}
-	return parsed.Path == "" || parsed.Path == "/"
-}
-
 // maskPassword masks the password in a database URL for security
 func maskPassword(dbURL string) string {
 	parsed, err := url.Parse(dbURL)
 	if err != nil {
 		return "***"
 	}
-
 	if parsed.User == nil {
 		return dbURL
 	}
-
 	password, ok := parsed.User.Password()
 	if !ok || password == "" {
 		return dbURL
 	}
-
 	return strings.Replace(dbURL, password, "***", 1)
 }
 
@@ -645,26 +598,6 @@ func maskSecret(secret string) string {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
-	}
-	return fallback
-}
-
-// getEnvBool retrieves an environment variable as boolean with a fallback value
-func getEnvBool(key string, fallback bool) bool {
-	if v := os.Getenv(key); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			return b
-		}
-	}
-	return fallback
-}
-
-// getEnvInt retrieves an environment variable as integer with a fallback value
-func getEnvInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			return i
-		}
 	}
 	return fallback
 }
@@ -685,18 +618,6 @@ func getEnvFloat64(key string, fallback float64) float64 {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			return f
 		}
-	}
-	return fallback
-}
-
-// getEnvSlice retrieves an environment variable as string slice with a fallback value
-func getEnvSlice(key string, fallback []string) []string {
-	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		for i, part := range parts {
-			parts[i] = strings.TrimSpace(part)
-		}
-		return parts
 	}
 	return fallback
 }
@@ -755,88 +676,3 @@ func validateDBPool(c *Config, result *ValidationResult) {
 	}
 }
 
-// GetRequiredEnvVars returns the list of required environment variables
-func GetRequiredEnvVars() []string {
-	return requiredEnvVars
-}
-
-// GetOptionalEnvVars returns the map of optional environment variables with their defaults
-func GetOptionalEnvVars() map[string]string {
-	return optionalEnvVars
-}
-
-// validateAllowedOrigins validates CORS origin configuration based on environment
-func validateAllowedOrigins(origins, env string) error {
-	if origins == "" {
-		return nil
-	}
-
-	// Parse comma-separated origins
-	originList := strings.Split(origins, ",")
-	for i, o := range originList {
-		originList[i] = strings.TrimSpace(o)
-	}
-
-	// Check for wildcard
-	hasWildcard := false
-	for _, o := range originList {
-		if o == "*" {
-			hasWildcard = true
-			break
-		}
-	}
-
-	// Wildcard validation
-	if hasWildcard {
-		// Wildcard only allowed in development
-		if env == "production" || env == "staging" {
-			return fmt.Errorf("wildcard origin (*) not allowed in %s environment", env)
-		}
-		// Wildcard must be the only origin
-		if len(originList) > 1 {
-			return fmt.Errorf("wildcard origin (*) cannot be combined with other origins")
-		}
-		return nil
-	}
-
-	// Validate each origin format
-	for _, origin := range originList {
-		if origin == "" {
-			continue
-		}
-
-		// Parse as URL
-		parsed, err := url.Parse(origin)
-		if err != nil {
-			return fmt.Errorf("invalid origin URL %q: %v", origin, err)
-		}
-
-		// Must have scheme
-		if parsed.Scheme == "" {
-			return fmt.Errorf("origin %q must include scheme (https://)", origin)
-		}
-
-		// Must have host
-		if parsed.Host == "" {
-			return fmt.Errorf("origin %q must include host", origin)
-		}
-
-		// Production/staging must use HTTPS
-		if (env == "production" || env == "staging") && parsed.Scheme != "https" {
-			return fmt.Errorf("origin %q must use https in %s environment", origin, env)
-		}
-
-		// Must not have path, query, or fragment
-		if parsed.Path != "" && parsed.Path != "/" {
-			return fmt.Errorf("origin %q must not include path", origin)
-		}
-		if parsed.RawQuery != "" {
-			return fmt.Errorf("origin %q must not include query parameters", origin)
-		}
-		if parsed.Fragment != "" {
-			return fmt.Errorf("origin %q must not include fragment", origin)
-		}
-	}
-
-	return nil
-}

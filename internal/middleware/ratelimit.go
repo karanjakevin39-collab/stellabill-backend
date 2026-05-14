@@ -51,11 +51,9 @@ type RateLimiterConfig struct {
 
 // APIRateLimiter manages multiple token buckets for rate limiting
 type APIRateLimiter struct {
-	config   RateLimiterConfig
-	buckets  map[string]*TokenBucket
-	mutex    sync.RWMutex
-	cleanup  *time.Ticker
-	stopChan chan struct{}
+	config  RateLimiterConfig
+	buckets map[string]*TokenBucket
+	mutex   sync.RWMutex
 }
 
 // NewTokenBucket creates a new token bucket
@@ -106,52 +104,15 @@ func (tb *TokenBucket) allowRequest() bool {
 // NewAPIRateLimiter creates a new API rate limiter
 func NewAPIRateLimiter(config RateLimiterConfig) *APIRateLimiter {
 	rl := &APIRateLimiter{
-		config:   config,
-		buckets:  make(map[string]*TokenBucket),
-		cleanup:  time.NewTicker(5 * time.Minute), // Cleanup every 5 minutes
-		stopChan: make(chan struct{}),
+		config:  config,
+		buckets: make(map[string]*TokenBucket),
 	}
 
 	if config.RouteConfigs == nil {
 		rl.config.RouteConfigs = make(map[string]RouteSpecificConfig)
 	}
 
-	// Start cleanup goroutine
-	go rl.cleanupExpiredBuckets()
-
 	return rl
-}
-
-// cleanupExpiredBuckets removes unused buckets to prevent memory leaks
-func (rl *APIRateLimiter) cleanupExpiredBuckets() {
-	for {
-		select {
-		case <-rl.cleanup.C:
-			rl.mutex.Lock()
-			now := timeutil.NowUTC()
-
-			for key, bucket := range rl.buckets {
-				bucket.mutex.Lock()
-				// Remove buckets that haven't been used for 10 minutes
-				if now.Sub(bucket.lastRefill) > 10*time.Minute {
-					delete(rl.buckets, key)
-				}
-				bucket.mutex.Unlock()
-			}
-
-			rl.mutex.Unlock()
-		case <-rl.stopChan:
-			return
-		}
-	}
-}
-
-// Stop stops the cleanup goroutine to prevent goroutine leaks
-func (rl *APIRateLimiter) Stop() {
-	if rl.cleanup != nil {
-		rl.cleanup.Stop()
-		close(rl.stopChan)
-	}
 }
 
 // getBucket retrieves or creates a token bucket for the given key with route-specific config
@@ -207,31 +168,17 @@ func (rl *APIRateLimiter) getKey(c *gin.Context) string {
 
 // getClientIP extracts the real client IP, considering proxies
 func getClientIP(c *gin.Context) string {
-	// Check X-Forwarded-For header (for proxies)
 	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		if idx := len(xff); idx > 0 {
-			if commaIdx := 0; commaIdx < idx {
-				for i, char := range xff {
-					if char == ',' {
-						commaIdx = i
-						break
-					}
-				}
-				if commaIdx > 0 {
-					return xff[:commaIdx]
-				}
+		for i, ch := range xff {
+			if ch == ',' {
+				return xff[:i]
 			}
-			return xff
 		}
+		return xff
 	}
-
-	// Check X-Real-IP header
 	if xri := c.GetHeader("X-Real-IP"); xri != "" {
 		return xri
 	}
-
-	// Fall back to RemoteAddr
 	return c.ClientIP()
 }
 

@@ -64,8 +64,6 @@ type Store interface {
 	SaveReports(reports []Report) error
 	ListReports() ([]Report, error)
 	ListReportsByTenant(tenantID string) ([]Report, error)
-	DeleteReportsByJobID(jobID string) error
-	GetReportsByJobID(jobID string) ([]Report, error)
 }
 
 // Reconciler performs comparisons between backend state and contract snapshots.

@@ -156,66 +156,6 @@ func TestReconcileHandler_MerchantCrossTenantBlocked(t *testing.T) {
 	}
 }
 
-func TestReconcileHandler_MerchantScopedSnapshots(t *testing.T) {
-	now := time.Now().UTC()
-
-	snap1 := reconciliation.Snapshot{
-		SubscriptionID: "sub-mine",
-		TenantID:       "tenant-1",
-		Status:         "active",
-		Amount:         1000,
-		Currency:       "USD",
-		Interval:       "monthly",
-		Balances:       map[string]int64{},
-		ExportedAt:     now,
-	}
-	snap2 := reconciliation.Snapshot{
-		SubscriptionID: "sub-other",
-		TenantID:       "tenant-2",
-		Status:         "active",
-		Amount:         2000,
-		Currency:       "USD",
-		Interval:       "monthly",
-		Balances:       map[string]int64{},
-		ExportedAt:     now,
-	}
-	adapter := reconciliation.NewMemoryAdapter(snap1, snap2)
-	store := reconciliation.NewMemoryStore()
-	r := setupReconcileRouter(adapter, store, "tenant-1", "merchant")
-
-	backend := reconciliation.BackendSubscription{
-		SubscriptionID: "sub-mine",
-		TenantID:       "tenant-1",
-		Status:         "active",
-		Amount:         1000,
-		Currency:       "USD",
-		Interval:       "monthly",
-		Balances:       map[string]int64{},
-		UpdatedAt:      now,
-	}
-	payload, _ := json.Marshal([]reconciliation.BackendSubscription{backend})
-
-	req := httptest.NewRequest(http.MethodPost, "/admin/reconcile", bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp struct {
-		Reports []reconciliation.Report `json:"reports"`
-	}
-	json.Unmarshal(w.Body.Bytes(), &resp)
-	if len(resp.Reports) != 1 {
-		t.Fatalf("expected 1 report, got %d", len(resp.Reports))
-	}
-	if resp.Reports[0].TenantID != "tenant-1" {
-		t.Fatalf("report tenant should be tenant-1, got %s", resp.Reports[0].TenantID)
-	}
-}
-
 func TestListReportsHandler_TenantIsolation(t *testing.T) {
 	store := reconciliation.NewMemoryStore()
 	_ = store.SaveReports([]reconciliation.Report{

@@ -43,10 +43,7 @@ func EncodeScopedCursor(id, sortValue, tenantID string) string {
 		TenantID:  tenantID,
 		Sig:       signCursor(id, sortValue, tenantID),
 	}
-	b, err := json.Marshal(sc)
-	if err != nil {
-		return ""
-	}
+	b, _ := json.Marshal(sc)
 	return base64.URLEncoding.EncodeToString(b)
 }
 

@@ -2,11 +2,9 @@ package auth
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 const RoleContextKey = "role"
@@ -74,7 +72,6 @@ func normalizeRoles(roles []Role) []Role {
 		result = append(result, role)
 	}
 	return result
-}
 }
 
 // RequirePermission middleware enforces role-based access control
