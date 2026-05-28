@@ -105,9 +105,6 @@ func AuthMiddleware(cache interface{}, jwtSecret string) gin.HandlerFunc {
 			tenantID = tenantHeader
 		} else if tenantClaim != "" {
 			tenantID = tenantClaim
-		} else {
-			respondAuthError(c, "tenant id required")
-			return
 		}
 
 		c.Set("callerID", sub)
