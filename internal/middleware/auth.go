@@ -30,7 +30,7 @@ func AuthMiddleware(cache interface{}, jwtSecret string) gin.HandlerFunc {
 		fmt.Printf("DEBUG: AuthMiddleware entered for path %s\n", c.Request.URL.Path)
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			respondAuthError(c, "authorization header required")
+			respondAuthError(c, "missing authorization header")
 			return
 		}
 
@@ -68,7 +68,7 @@ func AuthMiddleware(cache interface{}, jwtSecret string) gin.HandlerFunc {
 
 		if err != nil || !token.Valid {
 			fmt.Printf("DEBUG: token validation failed: %v\n", err)
-			respondAuthError(c, fmt.Sprintf("token validation failed: %v", err))
+			respondAuthError(c, "invalid or expired token")
 			return
 		}
 
