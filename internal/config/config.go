@@ -223,6 +223,13 @@ func Load(opts ...Option) (Config, error) {
 		TracingServiceName:  getEnv("TRACING_SERVICE_NAME", "stellabill-backend"),
 		AllowedOrigins:      getEnv("ALLOWED_ORIGINS", ""),
 		SecurityFrameAncestors: getEnv("SECURITY_FRAME_ANCESTORS", "'none'"),
+		DBPoolMaxConns:          DefaultDBPoolMaxConns,
+		DBPoolMinConns:          DefaultDBPoolMinConns,
+		DBPoolMaxConnLifetime:   DefaultDBPoolMaxConnLifetime,
+		DBPoolMaxConnIdleTime:   DefaultDBPoolMaxConnIdleTime,
+		DBPoolConnectTimeout:    DefaultDBPoolConnectTimeout,
+		DBPoolHealthCheckPeriod: DefaultDBPoolHealthCheckPeriod,
+		DBPoolMetricsInterval:   DefaultDBPoolMetricsInterval,
 	}
 
 	// Resolve secrets through the provider

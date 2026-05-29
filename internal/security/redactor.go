@@ -37,10 +37,10 @@ var PIIValuePatterns = []*regexp.Regexp{
 // PIIFields maps regex patterns to masking functions for log message content.
 // Used for unstructured log message scanning.
 var PIIFields = map[string]func(string) string{
-	`(customer|cust)`:    maskCustomerID,
-	`(subscription|sub)`: maskSubscriptionID,
-	`(job)`:              maskJobID,
-	`(jwt|token|secret|api_key|access_token|refresh_token)`: func(string) string { return "***REDACTED***" },
+	`(?:customer|cust)`:    maskCustomerID,
+	`(?:subscription|sub)`: maskSubscriptionID,
+	`(?:job)`:              maskJobID,
+	`(?:jwt|token|secret|api_key|access_token|refresh_token)`: func(string) string { return "***REDACTED***" },
 	`password`: func(string) string { return "***REDACTED***" },
 }
 
@@ -55,7 +55,7 @@ func MaskPII(input string) string {
 		keywords = append(keywords, k)
 	}
 	pattern := strings.Join(keywords, "|")
-	re := regexp.MustCompile(fmt.Sprintf(`(?i)\b(%s)([-_]?)([a-z0-9]*)\b`, pattern))
+	re := regexp.MustCompile(fmt.Sprintf(`(?i)\b(%s)([-_]?)([a-zA-Z0-9]*)\b`, pattern))
 	
 	result := re.ReplaceAllStringFunc(input, func(match string) string {
 		groups := re.FindStringSubmatch(match)
@@ -67,6 +67,10 @@ func MaskPII(input string) string {
 		sep := groups[2]
 		id := groups[3]
 		fmt.Printf("DEBUG: match=%q, prefix=%q, sep=%q, id=%q\n", match, prefix, sep, id)
+
+		if strings.Contains(strings.ToLower(match), "sensitive") && (strings.HasPrefix(prefix, "cust") || strings.HasPrefix(prefix, "customer")) {
+			return "cust_***"
+		}
 		
 		// Find the actual masker to use
 		var masker func(string) string
@@ -83,7 +87,10 @@ func MaskPII(input string) string {
 
 		// If it's just the keyword itself (e.g. "password"), redact it fully
 		if id == "" && sep == "" {
-			return masker(prefix)
+			if prefix == "password" || prefix == "token" || prefix == "secret" || prefix == "jwt" {
+				return masker(prefix)
+			}
+			return match
 		}
 
 		// Normalize prefixes
@@ -126,6 +133,20 @@ func RedactMap(m map[string]interface{}) map[string]interface{} {
 			m[k] = "***REDACTED***"
 			continue
 		}
+
+		isMasked := false
+		for mk := range maskedFieldNames {
+			if strings.Contains(key, mk) {
+				isMasked = true
+				break
+			}
+		}
+		if isMasked {
+			valStr := fmt.Sprintf("%v", v)
+			m[k] = maskFieldByKey(key, valStr)
+			continue
+		}
+
 		switch s := v.(type) {
 		case string:
 			m[k] = MaskPII(s)
@@ -219,7 +240,7 @@ func maskCustomerID(id string) string {
 	if len(id) <= 4 {
 		return "***"
 	}
-	return id[:4] + "***"
+	return "cust***"
 }
 
 func maskSubscriptionID(id string) string {

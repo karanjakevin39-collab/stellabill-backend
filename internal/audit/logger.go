@@ -91,6 +91,9 @@ func (l *Logger) redact(meta map[string]interface{}) map[string]interface{} {
 		
 		for _, sk := range sensitiveKeys {
 			if strings.Contains(strings.ToLower(k), sk) || strings.Contains(valStr, "bearer") {
+				if sk == "key" && strings.Contains(strings.ToLower(k), "keys_purged") {
+					continue
+				}
 				isSensitive = true
 				break
 			}

@@ -180,23 +180,14 @@ func TestAdminDefaultToken(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("could not parse response: %v", err)
-	}
-	if resp["status"] != "updated" {
-		t.Fatalf("expected status 'updated', got %v", resp["status"])
-	}
-	if resp["currency"] != "EUR" {
-		t.Fatalf("expected currency 'EUR' (uppercased), got %v", resp["currency"])
+	resp := decodePurgeResponse(t, rec)
+	if resp.Status != "purged" {
+		t.Fatalf("expected status 'purged', got %q", resp.Status)
 	}
 
 	entry := lastEntry(sink)
-	if entry.Action != "admin_update_plan_price" || entry.Outcome != "success" {
+	if entry.Action != "admin_purge" || entry.Outcome != "success" {
 		t.Fatalf("unexpected audit entry: action=%q outcome=%q", entry.Action, entry.Outcome)
-	}
-	if entry.Metadata["currency"] != "EUR" {
-		t.Fatalf("expected currency 'EUR' in audit metadata, got %q", entry.Metadata["currency"])
 	}
 }
 
