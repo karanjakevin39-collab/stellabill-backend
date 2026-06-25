@@ -8,16 +8,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"stellarbill-backend/internal/auth" // Adjust this import path to your module name
+	"stellarbill-backend/internal/auth"
 )
 
 var jwksCache *auth.JWKSCache
 
-// InitJWKSCache initializes the JWKS cache with the given URL and TTL
-// This should be called during application initialization
-func InitJWKSCache(jwksURL string, ttl int) {
+// InitJWKSCache initializes the JWKS cache with the given URL and TTL (seconds).
+func InitJWKSCache(jwksURL string, ttlSeconds int) {
 	if jwksURL != "" {
-		jwksCache = auth.NewJWKSCache(jwksURL, time.Duration(ttl)*time.Second)
+		jwksCache = auth.NewJWKSCache(jwksURL, time.Duration(ttlSeconds)*time.Second)
 	}
 }
 

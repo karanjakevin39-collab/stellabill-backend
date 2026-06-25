@@ -7,6 +7,7 @@ import (
 	"stellarbill-backend/internal/cache"
 	"sync"
 	"sync/atomic"
+	"golang.org/x/sync/singleflight"
 	"time"
 )
 
@@ -149,9 +150,8 @@ func (cpr *CachedPlanRepo) List(ctx context.Context) ([]*PlanRow, error) {
 				if unmarshalErr := json.Unmarshal(env.Data, &out); unmarshalErr == nil {
 					atomic.AddUint64(&cpr.hits, 1)
 					return out, nil
-				} else {
-					return nil, fmt.Errorf("corrupted cache envelope: %w", unmarshalErr)
 				}
+				return nil, fmt.Errorf("corrupted cache data: %w", err)
 			}
 		}
 	}
@@ -181,6 +181,7 @@ func (cpr *CachedPlanRepo) List(ctx context.Context) ([]*PlanRow, error) {
 	out, err := cpr.backend.List(ctx)
 	load.row = out
 	load.err = err
+	
 	if err != nil {
 		return nil, err
 	}
